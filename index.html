@@ -183,7 +183,7 @@
           <h2>Transport result</h2>
           <div class="plot-row">
             <div class="canvas-card"><h3>Envelope and quadrupoles</h3><canvas id="envelopeCanvas"></canvas></div>
-            <div class="canvas-card"><h3>x-y at selected z</h3><canvas id="xyCanvas"></canvas></div>
+            <div class="canvas-card"><h3>x-y density at selected z</h3><canvas id="xyCanvas"></canvas></div>
           </div>
           <div class="stats">
             <div class="stat">σx at view z <span id="statSigX" class="num">—</span></div>
@@ -199,8 +199,9 @@
 <script>
 (() => {
   const LQ_EFFECTIVE = 0.10;
-  const N_PHYS = 10000;
-  const N_PLOT_XSEC = 10000;
+  const N_PHYS = 5000;          // particles used for statistics and density plots
+  const N_PLOT_XSEC = 5000;     // kept for compatibility; density plots use all available particles
+  const DENSITY_BINS = 72;      // bins per axis for filled density/contour plots
   const Z_MIN_MARGIN = LQ_EFFECTIVE / 2 + 0.1;
   let rngSeed = Math.floor(Math.random() * 1e9) + 1;
 
@@ -505,9 +506,11 @@
     return {ctx, w: rect.width, h: rect.height};
   }
 
-  function drawAxes(ctx, w, h, xLabel, yLabel) {
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+  function drawAxes(ctx, w, h, xLabel, yLabel, keepExisting=false) {
+    if (!keepExisting) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    }
     const m = {l:54, r:14, t:14, b:42};
     ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
     ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
@@ -542,19 +545,74 @@
     return {px, py};
   }
 
-  function scatter(canvasId, xs, ys, xrange, yrange, xLabel, yLabel) {
+  function densityPlot(canvasId, xs, ys, xrange, yrange, xLabel, yLabel) {
     const canvas = document.getElementById(canvasId);
     const {ctx, w, h} = canvasSetup(canvas);
     const m = drawAxes(ctx, w, h, xLabel, yLabel);
     const map = drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange);
-    ctx.fillStyle = 'rgba(31, 111, 235, 0.38)';
-    const n = Math.min(xs.length, N_PLOT_XSEC);
-    const stride = Math.max(1, Math.floor(xs.length / n));
-    for (let i = 0; i < xs.length; i += stride) {
+
+    // Histogram-based filled density plot. Zero-density bins remain white.
+    const nx = DENSITY_BINS;
+    const ny = DENSITY_BINS;
+    const hist = Array.from({length: ny}, () => new Float64Array(nx));
+
+    for (let i = 0; i < xs.length; i++) {
       const x = xs[i], y = ys[i];
       if (x < -xrange || x > xrange || y < -yrange || y > yrange) continue;
-      ctx.beginPath(); ctx.arc(map.px(x), map.py(y), 1.7, 0, 2*Math.PI); ctx.fill();
+      let ix = Math.floor((x + xrange) / (2 * xrange) * nx);
+      let iy = Math.floor((y + yrange) / (2 * yrange) * ny);
+      ix = Math.max(0, Math.min(nx - 1, ix));
+      iy = Math.max(0, Math.min(ny - 1, iy));
+      hist[iy][ix] += 1;
     }
+
+    // Light smoothing to make the result look like a filled contour rather than blocky pixels.
+    const sm = Array.from({length: ny}, () => new Float64Array(nx));
+    const kernel = [[1,2,1],[2,4,2],[1,2,1]];
+    let vmax = 0;
+    for (let iy = 0; iy < ny; iy++) {
+      for (let ix = 0; ix < nx; ix++) {
+        let acc = 0, norm = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const yy = iy + dy, xx = ix + dx;
+            if (yy < 0 || yy >= ny || xx < 0 || xx >= nx) continue;
+            const wt = kernel[dy + 1][dx + 1];
+            acc += wt * hist[yy][xx];
+            norm += wt;
+          }
+        }
+        sm[iy][ix] = acc / norm;
+        if (sm[iy][ix] > vmax) vmax = sm[iy][ix];
+      }
+    }
+
+    function colorFor(t) {
+      // Quantized white-to-blue levels: visually similar to a filled contour map.
+      if (t <= 0) return '#ffffff';
+      const levels = ['#edf5ff', '#d7eaff', '#b7d7ff', '#8fbdff', '#5d99ee', '#2f6fce', '#174ea6'];
+      const j = Math.min(levels.length - 1, Math.floor(Math.pow(t, 0.45) * levels.length));
+      return levels[j];
+    }
+
+    if (vmax > 0) {
+      const x0 = map.px(-xrange), x1 = map.px(xrange);
+      const y0 = map.py(yrange), y1 = map.py(-yrange);
+      const cw = (x1 - x0) / nx;
+      const ch = (y1 - y0) / ny;
+      for (let iy = 0; iy < ny; iy++) {
+        for (let ix = 0; ix < nx; ix++) {
+          const t = sm[iy][ix] / vmax;
+          ctx.fillStyle = colorFor(t);
+          // Canvas y increases downward; iy=0 corresponds to lower y.
+          ctx.fillRect(x0 + ix * cw, y1 - (iy + 1) * ch, cw + 0.7, ch + 0.7);
+        }
+      }
+    }
+
+    // Redraw axes/grid on top so tick labels remain clean on the white background.
+    drawAxes(ctx, w, h, xLabel, yLabel, true);
+    drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange);
   }
 
   function drawEnvelope() {
@@ -619,12 +677,12 @@
 
   function drawAll() {
     const p = state.particles;
-    scatter('xxpCanvas', p.x.map(v=>v*1e3), p.xp.map(v=>v*1e3), state.xRangeInit, state.xpRangeInit, 'x [mm]', "x′ [mrad]");
-    scatter('yypCanvas', p.y.map(v=>v*1e3), p.yp.map(v=>v*1e3), state.yRangeInit, state.ypRangeInit, 'y [mm]', "y′ [mrad]");
-    scatter('xy0Canvas', p.x.map(v=>v*1e3), p.y.map(v=>v*1e3), state.xRangeInit, state.yRangeInit, 'x [mm]', 'y [mm]');
+    densityPlot('xxpCanvas', p.x.map(v=>v*1e3), p.xp.map(v=>v*1e3), state.xRangeInit, state.xpRangeInit, 'x [mm]', "x′ [mrad]");
+    densityPlot('yypCanvas', p.y.map(v=>v*1e3), p.yp.map(v=>v*1e3), state.yRangeInit, state.ypRangeInit, 'y [mm]', "y′ [mrad]");
+    densityPlot('xy0Canvas', p.x.map(v=>v*1e3), p.y.map(v=>v*1e3), state.xRangeInit, state.yRangeInit, 'x [mm]', 'y [mm]');
     drawEnvelope();
     const atz = propagateParticlesToZ(state.zView);
-    scatter('xyCanvas', atz.xz.map(v=>v*1e3), atz.yz.map(v=>v*1e3), state.xRangeCS, state.yRangeCS, 'x [mm]', 'y [mm]');
+    densityPlot('xyCanvas', atz.xz.map(v=>v*1e3), atz.yz.map(v=>v*1e3), state.xRangeCS, state.yRangeCS, 'x [mm]', 'y [mm]');
     document.getElementById('statSigX').textContent = fmt(interpAt(state.sigxZ, state.zView)*1e3, 3) + ' mm';
     document.getElementById('statSigY').textContent = fmt(interpAt(state.sigyZ, state.zView)*1e3, 3) + ' mm';
     document.getElementById('statFinalX').textContent = fmt(state.sigxZ[state.sigxZ.length-1]*1e3, 3) + ' mm';
