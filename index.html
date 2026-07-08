@@ -199,9 +199,9 @@
 <script>
 (() => {
   const LQ_EFFECTIVE = 0.10;
-  const N_PHYS = 20000;          // particles used for statistics and density plots
-  const N_PLOT_XSEC = 20000;     // kept for compatibility; density plots use all available particles
-  const DENSITY_BINS = 100;      // bins per axis for filled density/contour plots
+  const N_PHYS = 5000;          // particles used for statistics and density plots
+  const N_PLOT_XSEC = 5000;     // kept for compatibility; density plots use all available particles
+  const DENSITY_BINS = 72;      // bins per axis for filled density/contour plots
   const Z_MIN_MARGIN = LQ_EFFECTIVE / 2 + 0.1;
   let rngSeed = Math.floor(Math.random() * 1e9) + 1;
 
@@ -249,7 +249,7 @@
     ],
     beamline: [
       {id:'G', label:'G [T/m]', type:'range', min:-20, max:20, step:0.1, value:1, prop:'selectedG'},
-      {id:'zq', label:'z [m]', type:'range', min:Z_MIN_MARGIN, max:9.85, step:0.01, value:1, prop:'selectedZ'},
+      {id:'zq', label:'z [m]', type:'range', min:Z_MIN_MARGIN, max:100, step:0.01, value:1, prop:'selectedZ'},
       {id:'energy', label:'E [MeV]', type:'range', min:1, max:200, step:1, value:50, prop:'energy'},
       {id:'zMax', label:'z_max [m]', type:'number', min:0.7, max:100, step:0.1, value:10, prop:'zMax'},
       {id:'zView', label:'view z [m]', type:'range', min:0, max:10, step:0.01, value:1, prop:'zView', viewOnly:true},
@@ -316,18 +316,26 @@
   function transpose(A) { return [[A[0][0], A[1][0]], [A[0][1], A[1][1]]]; }
 
   function buildLattice(quadsWithK, zMax) {
+    // zMax is treated as the observation/plot end, not as a command to move magnets.
+    // Quads beyond zMax are simply not included in the propagated section.
     const quadsSorted = [...quadsWithK].sort((a, b) => a.z - b.z);
     const segments = [];
     let zPrev = 0.0;
     for (const q of quadsSorted) {
       const zEnter = q.z - LQ_EFFECTIVE / 2.0;
       const zExit = q.z + LQ_EFFECTIVE / 2.0;
+      if (zEnter >= zMax) break;
+      if (zExit <= 0) continue;
       if (zEnter > zPrev) {
         segments.push({type:'drift', L:zEnter - zPrev});
         zPrev = zEnter;
       }
-      segments.push({type:'quad', L:LQ_EFFECTIVE, K:q.K});
-      zPrev = zExit;
+      const quadLengthInside = Math.min(zExit, zMax) - zPrev;
+      if (quadLengthInside > 1e-12) {
+        segments.push({type:'quad', L:quadLengthInside, K:q.K});
+        zPrev += quadLengthInside;
+      }
+      if (zPrev >= zMax - 1e-12) break;
     }
     if (zPrev < zMax) segments.push({type:'drift', L:zMax - zPrev});
     const zGrid = Array.from({length:100}, (_, i) => zMax * i / 99);
@@ -466,6 +474,8 @@
   }
 
   function clampQuadPositions() {
+    // Only enforce a lower bound and a finite slider range. Do not tie quad positions to zMax.
+    // zMax changes the plotted/propagated length only; it must not silently move magnets.
     const minSpacing = LQ_EFFECTIVE + 0.05;
     const pairs = state.quads.map((q, i) => ({q, i})).sort((a, b) => a.q.z - b.q.z);
     for (let i = 1; i < pairs.length; i++) {
@@ -474,12 +484,11 @@
       }
     }
     const zMin = Z_MIN_MARGIN;
-    const zMaxC = state.zMax - LQ_EFFECTIVE / 2 - 0.1;
-    for (const q of state.quads) q.z = Math.min(Math.max(q.z, zMin), zMaxC);
+    const zMaxAllowed = 100.0;
+    for (const q of state.quads) q.z = Math.min(Math.max(q.z, zMin), zMaxAllowed);
   }
 
   function recomputeLatticeAndEnvelope() {
-    clampQuadPositions();
     const quadsK = state.quads.map(q => ({z:q.z, K:gradientToK(q.G, state.energy)}));
     const built = buildLattice(quadsK, state.zMax);
     state.segments = built.segments;
@@ -719,9 +728,7 @@
         if (state.zMax <= LQ_EFFECTIVE + 0.5) state.zMax = LQ_EFFECTIVE + 1.0;
         state.zView = Math.min(state.zView, state.zMax);
         const zViewInput = document.getElementById('zView');
-        const zqInput = document.getElementById('zq');
         zViewInput.max = state.zMax;
-        zqInput.max = state.zMax - LQ_EFFECTIVE/2 - 0.1;
       }
 
       if (spec.viewOnly) {
@@ -805,7 +812,7 @@
       });
       document.querySelector('input[name="distType"][value="Gaussian"]').checked = true;
       document.getElementById('zView').max = state.zMax;
-      document.getElementById('zq').max = state.zMax - LQ_EFFECTIVE/2 - 0.1;
+      document.getElementById('zq').max = 100;
       recomputeAll();
     });
 
