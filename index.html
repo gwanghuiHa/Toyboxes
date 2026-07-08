@@ -515,7 +515,7 @@
     return {ctx, w: rect.width, h: rect.height};
   }
 
-  function drawAxes(ctx, w, h, xLabel, yLabel, keepExisting=false) {
+  function drawAxes(ctx, w, h, xLabel, yLabel, keepExisting=false, drawLabels=true) {
     if (!keepExisting) {
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
@@ -523,13 +523,16 @@
     const m = {l:54, r:14, t:14, b:42};
     ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
     ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
-    ctx.fillStyle = '#222'; ctx.font = '12px system-ui, sans-serif';
-    ctx.textAlign = 'center'; ctx.fillText(xLabel, (w + m.l - m.r) / 2, h - 10);
-    ctx.save(); ctx.translate(14, (h + m.t - m.b)/2); ctx.rotate(-Math.PI/2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    if (drawLabels) {
+      ctx.fillStyle = '#222'; ctx.font = '12px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(xLabel, (w + m.l - m.r) / 2, h - 10);
+      ctx.save(); ctx.translate(14, (h + m.t - m.b)/2); ctx.rotate(-Math.PI/2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    }
     return m;
   }
 
-  function drawGrid(ctx, w, h, m, xMin, xMax, yMin, yMax) {
+  function drawGrid(ctx, w, h, m, xMin, xMax, yMin, yMax, drawTickLabels=true) {
     const px = x => m.l + (x - xMin) / (xMax - xMin) * (w - m.l - m.r);
     const py = y => h - m.b - (y - yMin) / (yMax - yMin) * (h - m.t - m.b);
     ctx.strokeStyle = '#ececf1'; ctx.lineWidth = 1;
@@ -539,14 +542,14 @@
       const x = xMin + (xMax - xMin) * i / 4;
       const xx = px(x);
       ctx.beginPath(); ctx.moveTo(xx, m.t); ctx.lineTo(xx, h - m.b); ctx.stroke();
-      ctx.fillText(fmt(x, 2), xx, h - m.b + 4);
+      if (drawTickLabels) ctx.fillText(fmt(x, 2), xx, h - m.b + 4);
     }
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     for (let i = 0; i <= 4; i++) {
       const y = yMin + (yMax - yMin) * i / 4;
       const yy = py(y);
       ctx.beginPath(); ctx.moveTo(m.l, yy); ctx.lineTo(w - m.r, yy); ctx.stroke();
-      ctx.fillText(fmt(y, 2), m.l - 5, yy);
+      if (drawTickLabels) ctx.fillText(fmt(y, 2), m.l - 5, yy);
     }
     ctx.strokeStyle = '#b7b7c2';
     if (xMin < 0 && xMax > 0) { ctx.beginPath(); ctx.moveTo(px(0), m.t); ctx.lineTo(px(0), h-m.b); ctx.stroke(); }
@@ -557,8 +560,10 @@
   function densityPlot(canvasId, xs, ys, xrange, yrange, xLabel, yLabel) {
     const canvas = document.getElementById(canvasId);
     const {ctx, w, h} = canvasSetup(canvas);
-    const m = drawAxes(ctx, w, h, xLabel, yLabel);
-    const map = drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange);
+    // First pass: draw background/grid only. Text labels are drawn once at the end.
+    // This avoids the doubled/overlapped tick/axis labels caused by redrawing on top.
+    const m = drawAxes(ctx, w, h, xLabel, yLabel, false, false);
+    const map = drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange, false);
 
     // Histogram-based filled density plot. Zero-density bins remain white.
     const nx = DENSITY_BINS;
@@ -619,9 +624,9 @@
       }
     }
 
-    // Redraw axes/grid on top so tick labels remain clean on the white background.
-    drawAxes(ctx, w, h, xLabel, yLabel, true);
-    drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange);
+    // Redraw axes/grid and labels exactly once on top.
+    drawAxes(ctx, w, h, xLabel, yLabel, true, true);
+    drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange, true);
   }
 
   function drawEnvelope() {
