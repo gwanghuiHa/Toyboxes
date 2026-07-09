@@ -176,7 +176,7 @@
           <select id="quadSelect"></select>
         </div>
         <div id="beamlineControls"></div>
-        <p class="note">Positive gradient focuses x and defocuses y. Quad effective length is fixed at 0.10 m.</p>
+        <p class="note">Positive gradient focuses x and defocuses y. Each quadrupole has its own effective length Lq. Sliders have finite visual ranges, but the text boxes are not limited; type a value and press Enter.</p>
       </section>
 
       <section>
@@ -208,12 +208,10 @@
 
 <script>
 (() => {
-  const LQ_EFFECTIVE = 0.10;
   const N_PHYS = 5000;          // particles used for statistics and density plots
   const N_PLOT_XSEC = 5000;     // kept for compatibility; density plots use all available particles
   const DENSITY_BINS = 72;      // bins per axis for filled density/contour plots
-  const Z_MIN_MARGIN = LQ_EFFECTIVE / 2 + 0.1;
-  let rngSeed = Math.floor(Math.random() * 1e9) + 1;
+    let rngSeed = Math.floor(Math.random() * 1e9) + 1;
 
   const state = {
     distType: 'Gaussian',
@@ -234,7 +232,7 @@
     yScale: 1.0,
     xRangeCS: 5.0,
     yRangeCS: 5.0,
-    quads: [{z: 1.0, G: 1.0}],
+    quads: [{z: 1.0, G: 1.0, L: 0.10}],
     particles: null,
     sigma0x: null,
     sigma0y: null,
@@ -259,8 +257,9 @@
     ],
     beamline: [
       {id:'G', label:'G [T/m]', type:'range', min:-20, max:20, step:0.1, value:1, prop:'selectedG'},
-      {id:'zq', label:'z [m]', type:'range', min:Z_MIN_MARGIN, max:100, step:0.01, value:1, prop:'selectedZ'},
+      {id:'zq', label:'z [m]', type:'range', min:0.05, max:100, step:0.01, value:1, prop:'selectedZ'},
       {id:'energy', label:'E [MeV]', type:'range', min:1, max:200, step:1, value:50, prop:'energy'},
+      {id:'lq', label:'selected Lq [m]', type:'range', min:0.001, max:5, step:0.001, value:0.10, prop:'selectedL'},
       {id:'zMax', label:'z_max [m]', type:'number', min:0.7, max:100, step:0.1, value:10, prop:'zMax'},
       {id:'zView', label:'view z [m]', type:'range', min:0, max:10, step:0.01, value:1, prop:'zView', viewOnly:true},
       {id:'yScale', label:'Y-scale', type:'range', min:0.5, max:10, step:0.1, value:1, prop:'yScale', viewOnly:true},
@@ -285,6 +284,12 @@
     const ax = Math.abs(x);
     if ((ax > 0 && ax < 1e-3) || ax >= 1e4) return x.toExponential(2);
     return x.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  }
+
+  function fmtSetting(x, digits=6) {
+    if (!Number.isFinite(x)) return '—';
+    if (x === 0) return '0.000000e+0';
+    return Number(x).toExponential(digits);
   }
 
   function driftMatrix(L) { return [[1.0, L], [0.0, 1.0]]; }
@@ -332,8 +337,9 @@
     const segments = [];
     let zPrev = 0.0;
     for (const q of quadsSorted) {
-      const zEnter = q.z - LQ_EFFECTIVE / 2.0;
-      const zExit = q.z + LQ_EFFECTIVE / 2.0;
+      const Lq = q.L;
+      const zEnter = q.z - Lq / 2.0;
+      const zExit = q.z + Lq / 2.0;
       if (zEnter >= zMax) break;
       if (zExit <= 0) continue;
       if (zEnter > zPrev) {
@@ -484,22 +490,30 @@
   }
 
   function clampQuadPositions() {
-    // Only enforce a lower bound and a finite slider range. Do not tie quad positions to zMax.
-    // zMax changes the plotted/propagated length only; it must not silently move magnets.
-    const minSpacing = LQ_EFFECTIVE + 0.05;
+    // Do not tie quad positions to zMax. zMax is only the propagated/plotted length.
+    // Only prevent unphysical negative entrance positions and overlapping hard-edge quads.
+    const margin = 0.05;
     const pairs = state.quads.map((q, i) => ({q, i})).sort((a, b) => a.q.z - b.q.z);
+
+    for (const {q} of pairs) {
+      if (!Number.isFinite(q.z)) q.z = 0.1 + (Number.isFinite(q.L) ? q.L : 0.10) / 2;
+      if (!Number.isFinite(q.L) || q.L <= 0) q.L = 0.10;
+      const zMin = q.L / 2 + 0.1;
+      if (q.z < zMin) q.z = zMin;
+    }
+
     for (let i = 1; i < pairs.length; i++) {
-      if (pairs[i].q.z - pairs[i-1].q.z < minSpacing) {
-        pairs[i].q.z = pairs[i-1].q.z + minSpacing;
+      const prev = pairs[i-1].q;
+      const cur = pairs[i].q;
+      const minDz = 0.5 * prev.L + 0.5 * cur.L + margin;
+      if (cur.z - prev.z < minDz) {
+        cur.z = prev.z + minDz;
       }
     }
-    const zMin = Z_MIN_MARGIN;
-    const zMaxAllowed = 100.0;
-    for (const q of state.quads) q.z = Math.min(Math.max(q.z, zMin), zMaxAllowed);
   }
 
   function recomputeLatticeAndEnvelope() {
-    const quadsK = state.quads.map(q => ({z:q.z, K:gradientToK(q.G, state.energy)}));
+    const quadsK = state.quads.map(q => ({z:q.z, L:q.L, K:gradientToK(q.G, state.energy)}));
     const built = buildLattice(quadsK, state.zMax);
     state.segments = built.segments;
     state.zGrid = built.zGrid;
@@ -653,8 +667,8 @@
     ctx.font = '11px system-ui, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     state.quads.forEach((q, i) => {
-      const left = q.z - LQ_EFFECTIVE / 2;
-      const right = q.z + LQ_EFFECTIVE / 2;
+      const left = q.z - q.L / 2;
+      const right = q.z + q.L / 2;
       ctx.fillStyle = i === state.selectedQuad ? 'rgba(217,119,6,0.85)' : 'rgba(43,108,176,0.85)';
       ctx.fillRect(map.px(left), map.py(quadHeight), map.px(right)-map.px(left), map.py(0)-map.py(quadHeight));
       ctx.fillStyle = '#111';
@@ -717,12 +731,19 @@
 
   function clampSpecValue(spec, value) {
     if (!Number.isFinite(value)) return getSpecValue(spec);
-    if (spec.type === 'log') {
-      const lo = Math.pow(10, spec.min);
-      const hi = Math.pow(10, spec.max);
-      return Math.min(Math.max(value, lo), hi);
-    }
-    return Math.min(Math.max(value, spec.min), spec.max);
+
+    // Text boxes are intentionally not limited by the slider min/max.
+    // Sliders still have finite ranges for usability, but typed values can exceed them.
+    const positiveProps = new Set([
+      'sigx','sigy','sigxp','sigyp',
+      'energy','selectedL','zMax','xRangeInit','yRangeInit','xpRangeInit','ypRangeInit',
+      'yScale','xRangeCS','yRangeCS'
+    ]);
+    const nonnegativeProps = new Set(['selectedZ','zView']);
+
+    if (positiveProps.has(spec.prop) && value <= 0) return getSpecValue(spec);
+    if (nonnegativeProps.has(spec.prop) && value < 0) return getSpecValue(spec);
+    return value;
   }
 
   function applySpecValue(spec, value) {
@@ -730,13 +751,16 @@
 
     if (spec.prop === 'selectedG') state.quads[state.selectedQuad].G = value;
     else if (spec.prop === 'selectedZ') state.quads[state.selectedQuad].z = value;
+    else if (spec.prop === 'selectedL') state.quads[state.selectedQuad].L = value;
     else state[spec.prop] = value;
 
+    if (spec.prop === 'selectedZ' || spec.prop === 'selectedL') {
+      clampQuadPositions();
+    }
+
     if (spec.prop === 'zMax') {
-      if (state.zMax <= LQ_EFFECTIVE + 0.5) state.zMax = LQ_EFFECTIVE + 1.0;
-      state.zView = Math.min(state.zView, state.zMax);
       const zViewInput = document.getElementById('zView');
-      if (zViewInput) zViewInput.max = state.zMax;
+      if (zViewInput) zViewInput.max = Math.max(state.zMax, Number(zViewInput.max) || state.zMax);
     }
 
     if (spec.viewOnly) {
@@ -774,7 +798,7 @@
     box.title = 'Type a value and press Enter';
 
     if (spec.type === 'number') {
-      input.type = 'number'; input.min = spec.min; input.max = spec.max; input.step = spec.step; input.value = spec.value;
+      input.type = 'number'; input.step = spec.step; input.value = spec.value;
     } else {
       input.type = 'range'; input.min = spec.min; input.max = spec.max; input.step = spec.step;
       input.value = spec.type === 'log' ? Math.log10(spec.value) : spec.value;
@@ -812,9 +836,9 @@
           else input.value = val;
         }
         const box = document.getElementById(spec.id + 'Box');
-        if (box && document.activeElement !== box) box.value = fmt(val, spec.step && spec.step < 0.1 ? 4 : 3);
+        if (box && document.activeElement !== box) box.value = fmtSetting(val, 6);
         const el = document.getElementById(spec.id + 'Val');
-        if (el) el.textContent = fmt(val, spec.step && spec.step < 0.1 ? 3 : 2);
+        if (el) el.textContent = fmtSetting(val, 4);
       }
     }
   }
@@ -822,6 +846,7 @@
   function getSpecValue(spec) {
     if (spec.prop === 'selectedG') return state.quads[state.selectedQuad].G;
     if (spec.prop === 'selectedZ') return state.quads[state.selectedQuad].z;
+    if (spec.prop === 'selectedL') return state.quads[state.selectedQuad].L;
     return state[spec.prop];
   }
 
@@ -832,7 +857,7 @@
     state.quads.forEach((q, i) => {
       const opt = document.createElement('option');
       opt.value = String(i);
-      opt.textContent = `Q${i}: z=${q.z.toFixed(2)} m, G=${q.G.toFixed(1)} T/m`;
+      opt.textContent = `Q${i}: z=${fmtSetting(q.z, 3)} m, G=${fmtSetting(q.G, 3)} T/m, L=${fmtSetting(q.L, 3)} m`;
       sel.appendChild(opt);
     });
     sel.value = oldValue;
@@ -852,9 +877,9 @@
       drawAll();
     });
     document.getElementById('addQuad').addEventListener('click', () => {
-      let zNew = state.quads.length ? Math.min(state.quads[state.quads.length-1].z + 0.5, state.zMax - LQ_EFFECTIVE/2 - 0.5) : 1.0;
-      zNew = Math.max(zNew, Z_MIN_MARGIN);
-      state.quads.push({z:zNew, G:1.0});
+      let zNew = state.quads.length ? state.quads[state.quads.length-1].z + 0.5 : 1.0;
+      zNew = Math.max(zNew, 0.10/2 + 0.1);
+      state.quads.push({z:zNew, G:1.0, L:0.10});
       state.selectedQuad = state.quads.length - 1;
       recomputeLatticeAndEnvelope(); drawAll();
     });
@@ -869,7 +894,7 @@
         distType:'Gaussian', sigx:1e-3, sigy:1e-3, sigxp:1e-4, sigyp:1e-4,
         slopeX:0, slopeY:0, xRangeInit:3, yRangeInit:3, xpRangeInit:3, ypRangeInit:3,
         zMax:10, energy:50, selectedQuad:0, zView:1, yScale:1, xRangeCS:5, yRangeCS:5,
-        quads:[{z:1.0, G:1.0}]
+        quads:[{z:1.0, G:1.0, L:0.10}]
       });
       document.querySelector('input[name="distType"][value="Gaussian"]').checked = true;
       document.getElementById('zView').max = state.zMax;
