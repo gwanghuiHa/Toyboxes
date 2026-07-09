@@ -219,6 +219,8 @@
     sigy: 1e-3,
     sigxp: 1e-4,
     sigyp: 1e-4,
+    epsx: 1e-7,
+    epsy: 1e-7,
     slopeX: 0.0,
     slopeY: 0.0,
     xRangeInit: 3.0,
@@ -248,6 +250,8 @@
       {id:'sigy', label:'σy [m]', type:'log', min:-4, max:-2, step:0.01, value:1e-3, prop:'sigy'},
       {id:'sigxp', label:"σx′ [rad]", type:'log', min:-5, max:-2, step:0.01, value:1e-4, prop:'sigxp'},
       {id:'sigyp', label:"σy′ [rad]", type:'log', min:-5, max:-2, step:0.01, value:1e-4, prop:'sigyp'},
+      {id:'epsx', label:'εx [m rad]', type:'log', min:-10, max:-4, step:0.01, value:1e-7, prop:'epsx'},
+      {id:'epsy', label:'εy [m rad]', type:'log', min:-10, max:-4, step:0.01, value:1e-7, prop:'epsy'},
       {id:'slopeX', label:'slope x [1/m]', type:'range', min:-10, max:10, step:0.1, value:0, prop:'slopeX'},
       {id:'slopeY', label:'slope y [1/m]', type:'range', min:-10, max:10, step:0.1, value:0, prop:'slopeY'},
       {id:'xRangeInit', label:'x range [mm]', type:'range', min:0.5, max:20, step:0.5, value:3, prop:'xRangeInit', viewOnly:true},
@@ -735,7 +739,7 @@
     // Text boxes are intentionally not limited by the slider min/max.
     // Sliders still have finite ranges for usability, but typed values can exceed them.
     const positiveProps = new Set([
-      'sigx','sigy','sigxp','sigyp',
+      'sigx','sigy','sigxp','sigyp','epsx','epsy',
       'energy','selectedL','zMax','xRangeInit','yRangeInit','xpRangeInit','ypRangeInit',
       'yScale','xRangeCS','yRangeCS'
     ]);
@@ -746,13 +750,30 @@
     return value;
   }
 
+  function updateNominalEmittances() {
+    state.epsx = Math.abs(state.sigx * state.sigxp);
+    state.epsy = Math.abs(state.sigy * state.sigyp);
+  }
+
   function applySpecValue(spec, value) {
     value = clampSpecValue(spec, value);
 
     if (spec.prop === 'selectedG') state.quads[state.selectedQuad].G = value;
     else if (spec.prop === 'selectedZ') state.quads[state.selectedQuad].z = value;
     else if (spec.prop === 'selectedL') state.quads[state.selectedQuad].L = value;
+    else if (spec.prop === 'epsx') {
+      state.epsx = Math.abs(value);
+      state.sigxp = state.epsx / Math.max(Math.abs(state.sigx), 1e-30);
+    }
+    else if (spec.prop === 'epsy') {
+      state.epsy = Math.abs(value);
+      state.sigyp = state.epsy / Math.max(Math.abs(state.sigy), 1e-30);
+    }
     else state[spec.prop] = value;
+
+    if (['sigx','sigxp','sigy','sigyp'].includes(spec.prop)) {
+      updateNominalEmittances();
+    }
 
     if (spec.prop === 'selectedZ' || spec.prop === 'selectedL') {
       clampQuadPositions();
@@ -765,7 +786,7 @@
 
     if (spec.viewOnly) {
       drawAll();
-    } else if (['sigx','sigy','sigxp','sigyp','slopeX','slopeY'].includes(spec.prop)) {
+    } else if (['sigx','sigy','sigxp','sigyp','epsx','epsy','epsx','epsy','slopeX','slopeY'].includes(spec.prop)) {
       recomputeAll();
     } else {
       recomputeLatticeAndEnvelope();
@@ -891,7 +912,7 @@
     });
     document.getElementById('reset').addEventListener('click', () => {
       Object.assign(state, {
-        distType:'Gaussian', sigx:1e-3, sigy:1e-3, sigxp:1e-4, sigyp:1e-4,
+        distType:'Gaussian', sigx:1e-3, sigy:1e-3, sigxp:1e-4, sigyp:1e-4, epsx:1e-7, epsy:1e-7,
         slopeX:0, slopeY:0, xRangeInit:3, yRangeInit:3, xpRangeInit:3, ypRangeInit:3,
         zMax:10, energy:50, selectedQuad:0, zView:1, yScale:1, xRangeCS:5, yRangeCS:5,
         quads:[{z:1.0, G:1.0, L:0.10}]
