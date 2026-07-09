@@ -218,7 +218,7 @@
     let rngSeed = Math.floor(Math.random() * 1e9) + 1;
 
   const state = {
-    distType: 'Uniform circular',
+    distType: 'Gaussian',
     sigx: 1.8477e-3,
     sigy: 0.765e-3,
     sigxp: 5.445e-6,
@@ -236,8 +236,8 @@
     selectedQuad: 0,
     zView: 1.0,
     yScale: 1.0,
-    xRangeCS: 5.0,
-    yRangeCS: 5.0,
+    xRangeCS: 10.0,
+    yRangeCS: 10.0,
     quads: [
       {z: 1.0, G: 0.0475, L: 0.05},
       {z: 101.0, G: -0.0475, L: 0.10},
