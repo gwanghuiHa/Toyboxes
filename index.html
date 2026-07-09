@@ -37,11 +37,12 @@
     header h1 { margin: 0 0 4px; font-size: 20px; font-weight: 650; }
     header p { margin: 0; color: #d1d5db; font-size: 13px; }
     main { padding: 14px; max-width: 1500px; margin: 0 auto; }
-    .grid {
+    .section-grid {
       display: grid;
-      grid-template-columns: minmax(260px, 360px) 1fr;
+      grid-template-columns: minmax(300px, 420px) 1fr;
       gap: 14px;
       align-items: start;
+      margin-bottom: 14px;
     }
     .panel {
       background: var(--panel);
@@ -141,7 +142,7 @@
     .stat .num { display: block; font-size: 17px; font-weight: 700; margin-top: 2px; }
     .note { color: var(--muted); font-size: 12px; line-height: 1.35; }
     @media (max-width: 1000px) {
-      .grid, .plot-row { grid-template-columns: 1fr; }
+      .section-grid, .plot-row { grid-template-columns: 1fr; }
       .plot-grid { grid-template-columns: 1fr; }
       canvas, #envelopeCanvas, #xyCanvas { height: 300px; }
     }
@@ -154,9 +155,9 @@
   </header>
 
   <main>
-    <div class="grid">
+    <div class="section-grid">
       <section class="panel">
-        <h2>Initial beam</h2>
+        <h2>Initial beam controls</h2>
         <div class="control">
           <label>XY shape</label>
           <div class="radio-row">
@@ -165,7 +166,21 @@
           </div>
         </div>
         <div id="initialControls"></div>
-        <h2 style="margin-top:16px;">Beamline</h2>
+      </section>
+
+      <section class="panel">
+        <h2>Initial phase space and transverse distribution</h2>
+        <div class="plot-grid">
+          <div class="canvas-card"><h3>x-x′</h3><canvas id="xxpCanvas"></canvas></div>
+          <div class="canvas-card"><h3>y-y′</h3><canvas id="yypCanvas"></canvas></div>
+          <div class="canvas-card"><h3>x-y</h3><canvas id="xy0Canvas"></canvas></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="section-grid">
+      <section class="panel">
+        <h2>Beamline / envelope controls</h2>
         <div class="button-row">
           <button id="addQuad" class="success">Add Quad</button>
           <button id="removeQuad" class="danger">Remove Quad</button>
@@ -179,28 +194,17 @@
         <p class="note">Positive gradient focuses x and defocuses y. Each quadrupole has its own effective length Lq. Sliders have finite visual ranges, but the text boxes are not limited; type a value and press Enter.</p>
       </section>
 
-      <section>
-        <div class="panel">
-          <h2>Initial phase space and transverse distribution</h2>
-          <div class="plot-grid">
-            <div class="canvas-card"><h3>x-x′</h3><canvas id="xxpCanvas"></canvas></div>
-            <div class="canvas-card"><h3>y-y′</h3><canvas id="yypCanvas"></canvas></div>
-            <div class="canvas-card"><h3>x-y</h3><canvas id="xy0Canvas"></canvas></div>
-          </div>
+      <section class="panel">
+        <h2>Transport result</h2>
+        <div class="plot-row">
+          <div class="canvas-card"><h3>Envelope and quadrupoles</h3><canvas id="envelopeCanvas"></canvas></div>
+          <div class="canvas-card"><h3>x-y density at selected z</h3><canvas id="xyCanvas"></canvas></div>
         </div>
-
-        <div class="panel" style="margin-top:14px;">
-          <h2>Transport result</h2>
-          <div class="plot-row">
-            <div class="canvas-card"><h3>Envelope and quadrupoles</h3><canvas id="envelopeCanvas"></canvas></div>
-            <div class="canvas-card"><h3>x-y density at selected z</h3><canvas id="xyCanvas"></canvas></div>
-          </div>
-          <div class="stats">
-            <div class="stat">σx at view z <span id="statSigX" class="num">—</span></div>
-            <div class="stat">σy at view z <span id="statSigY" class="num">—</span></div>
-            <div class="stat">final σx <span id="statFinalX" class="num">—</span></div>
-            <div class="stat">final σy <span id="statFinalY" class="num">—</span></div>
-          </div>
+        <div class="stats">
+          <div class="stat">σx at view z <span id="statSigX" class="num">—</span></div>
+          <div class="stat">σy at view z <span id="statSigY" class="num">—</span></div>
+          <div class="stat">final σx <span id="statFinalX" class="num">—</span></div>
+          <div class="stat">final σy <span id="statFinalY" class="num">—</span></div>
         </div>
       </section>
     </div>
