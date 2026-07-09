@@ -864,8 +864,33 @@
     }
 
     if (spec.prop === 'zMax') {
-      const zViewInput = document.getElementById('zView');
-      if (zViewInput) zViewInput.max = Math.max(state.zMax, Number(zViewInput.max) || state.zMax);
+      const zViewSlider = document.getElementById('zView');
+      const zViewBox = document.getElementById('zViewBox');
+      const zViewVal = document.getElementById('zViewVal');
+    
+      // Keep the original ratio: z_max = 10 -> step = 0.01
+      const zViewStep = state.zMax / 1000.0;
+    
+      if (zViewSlider) {
+        zViewSlider.max = state.zMax;
+        zViewSlider.step = zViewStep;
+      }
+    
+      if (state.zView > state.zMax) {
+        state.zView = state.zMax;
+    
+        if (zViewSlider) {
+          zViewSlider.value = state.zView;
+        }
+    
+        if (zViewBox) {
+          zViewBox.value = sci(state.zView);
+        }
+    
+        if (zViewVal) {
+          zViewVal.textContent = sci(state.zView);
+        }
+      }
     }
 
     if (spec.viewOnly) {
