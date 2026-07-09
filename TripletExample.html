@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Beam Focusing Toybox</title>
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --panel: #ffffff;
+      --text: #171717;
+      --muted: #666;
+      --line: #d8d8df;
+      --accent: #1f6feb;
+      --danger: #b42318;
+      --success: #137333;
+      --quad: #2b6cb0;
+      --quad-selected: #d97706;
+      --xline: #1f77b4;
+      --yline: #d62728;
+      --red: #c1121f;
+      --shadow: 0 1px 8px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 14px 18px;
+      background: #111827;
+      color: #fff;
+      border-bottom: 1px solid #000;
+    }
+    header h1 { margin: 0 0 4px; font-size: 20px; font-weight: 650; }
+    header p { margin: 0; color: #d1d5db; font-size: 13px; }
+    main { padding: 14px; max-width: 1500px; margin: 0 auto; }
+    .section-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 420px) 1fr;
+      gap: 14px;
+      align-items: start;
+      margin-bottom: 14px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+    .control { margin: 9px 0; }
+    .control label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .value { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .control-row {
+      display: grid;
+      grid-template-columns: 1fr 92px;
+      gap: 8px;
+      align-items: center;
+    }
+    input[type="range"] { width: 100%; }
+    input[type="number"], input[type="text"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 13px;
+    }
+    input.readback {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .radio-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+    .button-row { display: flex; gap: 8px; margin: 10px 0; }
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.success { background: #ecfdf3; color: var(--success); border-color: #b7e4c7; }
+    button.danger { background: #fff1f0; color: var(--danger); border-color: #ffc9c9; }
+    button.secondary { background: #f3f4f6; }
+    .plot-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .plot-row {
+      display: grid;
+      grid-template-columns: minmax(420px, 2fr) minmax(280px, 1fr);
+      gap: 12px;
+    }
+    .canvas-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      min-width: 0;
+    }
+    .canvas-card h3 { margin: 0 0 6px; font-size: 13px; color: #333; }
+    canvas {
+      width: 100%;
+      height: 300px;
+      display: block;
+      border-radius: 6px;
+      background: #fff;
+    }
+    #envelopeCanvas { height: 430px; }
+    #xyCanvas { height: 430px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      background: #fbfbfc;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 12px;
+    }
+    .stat .num { display: block; font-size: 17px; font-weight: 700; margin-top: 2px; }
+    .note { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    @media (max-width: 1000px) {
+      .section-grid, .plot-row { grid-template-columns: 1fr; }
+      .plot-grid { grid-template-columns: 1fr; }
+      canvas, #envelopeCanvas, #xyCanvas { height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Beam Focusing Toybox</h1>
+    <p>Standalone browser version. No Colab runtime, no Python kernel, no login. Each browser has independent state.</p>
+  </header>
+
+  <main>
+    <div class="section-grid">
+      <section class="panel">
+        <h2>Initial beam controls</h2>
+        <div class="control">
+          <label>XY shape</label>
+          <div class="radio-row">
+            <label><input type="radio" name="distType" value="Gaussian" checked> Gaussian</label>
+            <label><input type="radio" name="distType" value="Uniform circular"> Uniform circular</label>
+          </div>
+        </div>
+        <div id="initialControls"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Initial phase space and transverse distribution</h2>
+        <div class="plot-grid">
+          <div class="canvas-card"><h3>x-x′</h3><canvas id="xxpCanvas"></canvas></div>
+          <div class="canvas-card"><h3>y-y′</h3><canvas id="yypCanvas"></canvas></div>
+          <div class="canvas-card"><h3>x-y</h3><canvas id="xy0Canvas"></canvas></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="section-grid">
+      <section class="panel">
+        <h2>Beamline / envelope controls</h2>
+        <div class="button-row">
+          <button id="addQuad" class="success">Add Quad</button>
+          <button id="removeQuad" class="danger">Remove Quad</button>
+          <button id="reset" class="secondary">Reset</button>
+        </div>
+        <div class="control">
+          <label for="quadSelect">Select quad</label>
+          <select id="quadSelect"></select>
+        </div>
+        <div id="beamlineControls"></div>
+        <p class="note">Positive gradient focuses x and defocuses y. Each quadrupole has its own effective length Lq. Sliders have finite visual ranges, but the text boxes are not limited; type a value and press Enter.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Transport result</h2>
+        <div class="plot-row">
+          <div class="canvas-card"><h3>Envelope and quadrupoles</h3><canvas id="envelopeCanvas"></canvas></div>
+          <div class="canvas-card"><h3>x-y density at selected z</h3><canvas id="xyCanvas"></canvas></div>
+        </div>
+        <div class="stats">
+          <div class="stat">σx at view z <span id="statSigX" class="num">—</span></div>
+          <div class="stat">σy at view z <span id="statSigY" class="num">—</span></div>
+          <div class="stat">final σx <span id="statFinalX" class="num">—</span></div>
+          <div class="stat">final σy <span id="statFinalY" class="num">—</span></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+<script>
+(() => {
+  const N_PHYS = 5000;          // particles used for statistics and density plots
+  const N_PLOT_XSEC = 5000;     // kept for compatibility; density plots use all available particles
+  const DENSITY_BINS = 72;      // bins per axis for filled density/contour plots
+    let rngSeed = Math.floor(Math.random() * 1e9) + 1;
+
+  const state = {
+    distType: 'Gaussian',
+    sigx: 1.8477e-3,
+    sigy: 0.765e-3,
+    sigxp: 5.445e-6,
+    sigyp: 1.323e-5,
+    epsx: 1e-8,
+    epsy: 1e-8,
+    slopeX: 0.0,
+    slopeY: 0.0,
+    xRangeInit: 10.0,
+    yRangeInit: 10.0,
+    xpRangeInit: 5.0,
+    ypRangeInit: 5.0,
+    zMax: 1000.0,
+    energy: 100.0,
+    selectedQuad: 0,
+    zView: 1.0,
+    yScale: 1.0,
+    xRangeCS: 10.0,
+    yRangeCS: 10.0,
+    quads: [
+  {z: 1.0, G: 0.5, L: 0.10},
+  {z: 6.1, G: -0.9, L: 0.10},
+  {z: 11.2, G: 0.5, L: 0.10},
+
+  {z: 51.3, G: -0.5, L: 0.10},
+  {z: 56.4, G: 0.9, L: 0.10},
+  {z: 61.5, G: -0.5, L: 0.10},
+
+  {z: 101.6, G: 0.5, L: 0.10},
+  {z: 106.7, G: -0.9, L: 0.10},
+  {z: 111.8, G: 0.5, L: 0.10},
+
+  {z: 151.9, G: -0.5, L: 0.10},
+  {z: 157.0, G: 0.9, L: 0.10},
+  {z: 162.1, G: -0.5, L: 0.10},
+
+  {z: 202.2, G: 0.5, L: 0.10},
+  {z: 207.3, G: -0.9, L: 0.10},
+  {z: 212.4, G: 0.5, L: 0.10},
+
+  {z: 252.5, G: -0.5, L: 0.10},
+  {z: 257.6, G: 0.9, L: 0.10},
+  {z: 262.7, G: -0.5, L: 0.10},
+
+  {z: 302.8, G: 0.5, L: 0.10},
+  {z: 307.9, G: -0.9, L: 0.10},
+  {z: 313.0, G: 0.5, L: 0.10},
+
+  {z: 353.1, G: -0.5, L: 0.10},
+  {z: 358.2, G: 0.9, L: 0.10},
+  {z: 363.3, G: -0.5, L: 0.10},
+
+  {z: 403.4, G: 0.5, L: 0.10},
+  {z: 408.5, G: -0.9, L: 0.10},
+  {z: 413.6, G: 0.5, L: 0.10},
+
+  {z: 453.7, G: -0.5, L: 0.10},
+  {z: 458.8, G: 0.9, L: 0.10},
+  {z: 463.9, G: -0.5, L: 0.10},
+
+  {z: 504.0, G: 0.5, L: 0.10},
+  {z: 509.1, G: -0.9, L: 0.10},
+  {z: 514.2, G: 0.5, L: 0.10},
+
+  {z: 554.3, G: -0.5, L: 0.10},
+  {z: 559.4, G: 0.9, L: 0.10},
+  {z: 564.5, G: -0.5, L: 0.10},
+
+  {z: 604.6, G: 0.5, L: 0.10},
+  {z: 609.7, G: -0.9, L: 0.10},
+  {z: 614.8, G: 0.5, L: 0.10},
+
+  {z: 654.9, G: -0.5, L: 0.10},
+  {z: 660.0, G: 0.9, L: 0.10},
+  {z: 665.1, G: -0.5, L: 0.10},
+
+  {z: 705.2, G: 0.5, L: 0.10},
+  {z: 710.3, G: -0.9, L: 0.10},
+  {z: 715.4, G: 0.5, L: 0.10},
+
+  {z: 755.5, G: -0.5, L: 0.10},
+  {z: 760.6, G: 0.9, L: 0.10},
+  {z: 765.7, G: -0.5, L: 0.10},
+
+  {z: 805.8, G: 0.5, L: 0.10},
+  {z: 810.9, G: -0.9, L: 0.10},
+  {z: 816.0, G: 0.5, L: 0.10},
+
+  {z: 856.1, G: -0.5, L: 0.10},
+  {z: 861.2, G: 0.9, L: 0.10},
+  {z: 866.3, G: -0.5, L: 0.10},
+
+  {z: 906.4, G: 0.5, L: 0.10},
+  {z: 911.5, G: -0.9, L: 0.10},
+  {z: 916.6, G: 0.5, L: 0.10},
+
+  {z: 956.7, G: -0.5, L: 0.10},
+  {z: 961.8, G: 0.9, L: 0.10},
+  {z: 966.9, G: -0.5, L: 0.10}
+],
+    particles: null,
+    sigma0x: null,
+    sigma0y: null,
+    segments: null,
+    zGrid: null,
+    sigxZ: null,
+    sigyZ: null
+  };
+
+  const controls = {
+    initial: [
+      {id:'sigx', label:'σx [m]', type:'log', min:-4, max:-2, step:0.01, value:1e-3, prop:'sigx'},
+      {id:'sigy', label:'σy [m]', type:'log', min:-4, max:-2, step:0.01, value:1e-3, prop:'sigy'},
+      {id:'sigxp', label:"σx′ [rad]", type:'log', min:-5, max:-2, step:0.01, value:1e-4, prop:'sigxp'},
+      {id:'sigyp', label:"σy′ [rad]", type:'log', min:-5, max:-2, step:0.01, value:1e-4, prop:'sigyp'},
+      {id:'epsx', label:'εx [m rad]', type:'log', min:-10, max:-4, step:0.01, value:1e-7, prop:'epsx'},
+      {id:'epsy', label:'εy [m rad]', type:'log', min:-10, max:-4, step:0.01, value:1e-7, prop:'epsy'},
+      {id:'slopeX', label:'slope x [1/m]', type:'range', min:-10, max:10, step:0.1, value:0, prop:'slopeX'},
+      {id:'slopeY', label:'slope y [1/m]', type:'range', min:-10, max:10, step:0.1, value:0, prop:'slopeY'},
+      {id:'xRangeInit', label:'x range [mm]', type:'range', min:0.5, max:20, step:0.5, value:3, prop:'xRangeInit', viewOnly:true},
+      {id:'yRangeInit', label:'y range [mm]', type:'range', min:0.5, max:20, step:0.5, value:3, prop:'yRangeInit', viewOnly:true},
+      {id:'xpRangeInit', label:"x′ range [mrad]", type:'range', min:0.5, max:20, step:0.5, value:3, prop:'xpRangeInit', viewOnly:true},
+      {id:'ypRangeInit', label:"y′ range [mrad]", type:'range', min:0.5, max:20, step:0.5, value:3, prop:'ypRangeInit', viewOnly:true}
+    ],
+    beamline: [
+      {id:'G', label:'G [T/m]', type:'range', min:-20, max:20, step:0.1, value:1, prop:'selectedG'},
+      {id:'zq', label:'z [m]', type:'range', min:0.05, max:100, step:0.01, value:1, prop:'selectedZ'},
+      {id:'energy', label:'E [MeV]', type:'range', min:1, max:200, step:1, value:50, prop:'energy'},
+      {id:'lq', label:'selected Lq [m]', type:'range', min:0.001, max:5, step:0.001, value:0.10, prop:'selectedL'},
+      {id:'zMax', label:'z_max [m]', type:'number', min:0.7, max:100, step:0.1, value:10, prop:'zMax'},
+      {id:'zView', label:'view z [m]', type:'range', min:0, max:10, step:0.01, value:1, prop:'zView', viewOnly:true},
+      {id:'yScale', label:'Y-scale', type:'range', min:0.5, max:10, step:0.1, value:1, prop:'yScale', viewOnly:true},
+      {id:'xRangeCS', label:'x img [mm]', type:'range', min:0.5, max:50, step:0.5, value:5, prop:'xRangeCS', viewOnly:true},
+      {id:'yRangeCS', label:'y img [mm]', type:'range', min:0.5, max:50, step:0.5, value:5, prop:'yRangeCS', viewOnly:true}
+    ]
+  };
+
+  function rand() {
+    // Park-Miller LCG
+    rngSeed = (rngSeed * 16807) % 2147483647;
+    return (rngSeed - 1) / 2147483646;
+  }
+  function randn() {
+    const u1 = Math.max(rand(), 1e-12);
+    const u2 = rand();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+
+  function fmt(x, digits=3) {
+    if (!Number.isFinite(x)) return '—';
+    const ax = Math.abs(x);
+    if ((ax > 0 && ax < 1e-3) || ax >= 1e4) return x.toExponential(2);
+    return x.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  }
+
+  function fmtSetting(x, digits=6) {
+    if (!Number.isFinite(x)) return '—';
+    if (x === 0) return '0.000000e+0';
+    return Number(x).toExponential(digits);
+  }
+
+  function driftMatrix(L) { return [[1.0, L], [0.0, 1.0]]; }
+
+  function gradientToK(G_Tperm, energy_MeV) {
+    const e = 1.602176634e-19;
+    const m_e = 9.10938356e-31;
+    const c = 299792458.0;
+    const mc2_MeV = 0.511;
+    const E_tot_MeV = energy_MeV + mc2_MeV;
+    const gamma = E_tot_MeV / mc2_MeV;
+    const beta = Math.sqrt(Math.max(0, 1.0 - 1.0 / (gamma * gamma)));
+    const p = beta * gamma * m_e * c;
+    return e * G_Tperm / p;
+  }
+
+  function quadThickMatrix(L, K_plane) {
+    if (Math.abs(K_plane) < 1e-15) return driftMatrix(L);
+    if (K_plane > 0) {
+      const k = Math.sqrt(K_plane);
+      const phi = k * L;
+      const c = Math.cos(phi);
+      const s = Math.sin(phi);
+      return [[c, s / k], [-k * s, c]];
+    }
+    const k = Math.sqrt(-K_plane);
+    const phi = k * L;
+    const c = Math.cosh(phi);
+    const s = Math.sinh(phi);
+    return [[c, s / k], [k * s, c]];
+  }
+
+  function matmul(A, B) {
+    return [
+      [A[0][0]*B[0][0] + A[0][1]*B[1][0], A[0][0]*B[0][1] + A[0][1]*B[1][1]],
+      [A[1][0]*B[0][0] + A[1][1]*B[1][0], A[1][0]*B[0][1] + A[1][1]*B[1][1]]
+    ];
+  }
+  function transpose(A) { return [[A[0][0], A[1][0]], [A[0][1], A[1][1]]]; }
+
+  function buildLattice(quadsWithK, zMax) {
+    // zMax is treated as the observation/plot end, not as a command to move magnets.
+    // Quads beyond zMax are simply not included in the propagated section.
+    const quadsSorted = [...quadsWithK].sort((a, b) => a.z - b.z);
+    const segments = [];
+    let zPrev = 0.0;
+    for (const q of quadsSorted) {
+      const Lq = q.L;
+      const zEnter = q.z - Lq / 2.0;
+      const zExit = q.z + Lq / 2.0;
+      if (zEnter >= zMax) break;
+      if (zExit <= 0) continue;
+      if (zEnter > zPrev) {
+        segments.push({type:'drift', L:zEnter - zPrev});
+        zPrev = zEnter;
+      }
+      const quadLengthInside = Math.min(zExit, zMax) - zPrev;
+      if (quadLengthInside > 1e-12) {
+        segments.push({type:'quad', L:quadLengthInside, K:q.K});
+        zPrev += quadLengthInside;
+      }
+      if (zPrev >= zMax - 1e-12) break;
+    }
+    if (zPrev < zMax) segments.push({type:'drift', L:zMax - zPrev});
+    const zGrid = Array.from({length:100}, (_, i) => zMax * i / 99);
+    return {segments, zGrid};
+  }
+
+  function propagateSigmaPlane(segmentsIn, zGrid, Sigma0, signK) {
+    let segments = segmentsIn.length ? segmentsIn : [{type:'drift', L:Math.max(zGrid[zGrid.length-1], 1e-6)}];
+    let zCurrent = 0.0;
+    let M = [[1,0],[0,1]];
+    const sigmaPos = [];
+    const sigmaArray = [];
+    let segIndex = 0;
+    let seg = segments[segIndex];
+    let segType = seg.type;
+    let segRemaining = seg.L;
+    let segK = seg.K || 0.0;
+
+    for (const z of zGrid) {
+      let dzTotal = z - zCurrent;
+      while (dzTotal > 1e-12) {
+        const step = Math.min(dzTotal, segRemaining);
+        let MStep;
+        if (segType === 'drift') MStep = driftMatrix(step);
+        else MStep = quadThickMatrix(step, signK * segK);
+        M = matmul(MStep, M);
+        zCurrent += step;
+        dzTotal -= step;
+        segRemaining -= step;
+        if (segRemaining <= 1e-12) {
+          segIndex += 1;
+          if (segIndex < segments.length) {
+            seg = segments[segIndex];
+            segType = seg.type;
+            segRemaining = seg.L;
+            segK = seg.K || 0.0;
+          } else {
+            segType = 'drift'; segRemaining = 1e9; segK = 0.0;
+          }
+        }
+      }
+      const Sigma = matmul(matmul(M, Sigma0), transpose(M));
+      sigmaArray.push(Sigma);
+      sigmaPos.push(Math.sqrt(Math.max(0, Sigma[0][0])));
+    }
+    return {sigmaPos, sigmaArray};
+  }
+
+  function covariance2(a, b) {
+    const n = a.length;
+    const ma = a.reduce((s, v) => s + v, 0) / n;
+    const mb = b.reduce((s, v) => s + v, 0) / n;
+    let c00 = 0, c01 = 0, c11 = 0;
+    for (let i = 0; i < n; i++) {
+      const da = a[i] - ma;
+      const db = b[i] - mb;
+      c00 += da * da;
+      c01 += da * db;
+      c11 += db * db;
+    }
+    const d = Math.max(n - 1, 1);
+    return [[c00 / d, c01 / d], [c01 / d, c11 / d]];
+  }
+
+  function generateInitialDistribution() {
+    const x = [], xp = [], y = [], yp = [];
+    const R = 2.0 * Math.max(state.sigx, state.sigy);
+    for (let i = 0; i < N_PHYS; i++) {
+      let xi, yi;
+      if (state.distType === 'Gaussian') {
+        xi = randn() * state.sigx;
+        yi = randn() * state.sigy;
+      } else {
+        const r = R * Math.sqrt(rand());
+        const theta = 2 * Math.PI * rand();
+        xi = r * Math.cos(theta);
+        yi = r * Math.sin(theta);
+      }
+      const xpu = randn() * state.sigxp;
+      const ypu = randn() * state.sigyp;
+      x.push(xi);
+      y.push(yi);
+      xp.push(state.slopeX * xi + xpu);
+      yp.push(state.slopeY * yi + ypu);
+    }
+    state.particles = {x, xp, y, yp};
+    state.sigma0x = covariance2(x, xp);
+    state.sigma0y = covariance2(y, yp);
+  }
+
+  function propagateParticlesToZ(zTarget) {
+    const p = state.particles;
+    let segments = state.segments && state.segments.length ? state.segments : [{type:'drift', L:zTarget}];
+    let zCurrent = 0.0;
+    let Mx = [[1,0],[0,1]], My = [[1,0],[0,1]];
+    let segIndex = 0;
+    let seg = segments[segIndex];
+    let segType = seg.type;
+    let segRemaining = seg.L;
+    let segK = seg.K || 0.0;
+    zTarget = Number(zTarget);
+
+    while (zCurrent < zTarget - 1e-12) {
+      const dzTotal = zTarget - zCurrent;
+      const step = Math.min(dzTotal, segRemaining);
+      if (segType === 'drift') {
+        const MStep = driftMatrix(step);
+        Mx = matmul(MStep, Mx);
+        My = matmul(MStep, My);
+      } else {
+        Mx = matmul(quadThickMatrix(step, +segK), Mx);
+        My = matmul(quadThickMatrix(step, -segK), My);
+      }
+      zCurrent += step;
+      segRemaining -= step;
+      if (segRemaining <= 1e-12) {
+        segIndex += 1;
+        if (segIndex < segments.length) {
+          seg = segments[segIndex];
+          segType = seg.type;
+          segRemaining = seg.L;
+          segK = seg.K || 0.0;
+        } else {
+          segType = 'drift'; segRemaining = 1e9; segK = 0.0;
+        }
+      }
+    }
+    const xz = [], xpz = [], yz = [], ypz = [];
+    for (let i = 0; i < p.x.length; i++) {
+      xz.push(Mx[0][0]*p.x[i] + Mx[0][1]*p.xp[i]);
+      xpz.push(Mx[1][0]*p.x[i] + Mx[1][1]*p.xp[i]);
+      yz.push(My[0][0]*p.y[i] + My[0][1]*p.yp[i]);
+      ypz.push(My[1][0]*p.y[i] + My[1][1]*p.yp[i]);
+    }
+    return {xz, xpz, yz, ypz};
+  }
+
+  function clampQuadPositions() {
+    // Do not tie quad positions to zMax. zMax is only the propagated/plotted length.
+    // Only prevent unphysical negative entrance positions and overlapping hard-edge quads.
+    const margin = 0.05;
+    const pairs = state.quads.map((q, i) => ({q, i})).sort((a, b) => a.q.z - b.q.z);
+
+    for (const {q} of pairs) {
+      if (!Number.isFinite(q.z)) q.z = 0.1 + (Number.isFinite(q.L) ? q.L : 0.10) / 2;
+      if (!Number.isFinite(q.L) || q.L <= 0) q.L = 0.10;
+      const zMin = q.L / 2 + 0.1;
+      if (q.z < zMin) q.z = zMin;
+    }
+
+    for (let i = 1; i < pairs.length; i++) {
+      const prev = pairs[i-1].q;
+      const cur = pairs[i].q;
+      const minDz = 0.5 * prev.L + 0.5 * cur.L + margin;
+      if (cur.z - prev.z < minDz) {
+        cur.z = prev.z + minDz;
+      }
+    }
+  }
+
+  function recomputeLatticeAndEnvelope() {
+    const quadsK = state.quads.map(q => ({z:q.z, L:q.L, K:gradientToK(q.G, state.energy)}));
+    const built = buildLattice(quadsK, state.zMax);
+    state.segments = built.segments;
+    state.zGrid = built.zGrid;
+    const sx = propagateSigmaPlane(state.segments, state.zGrid, state.sigma0x, +1);
+    const sy = propagateSigmaPlane(state.segments, state.zGrid, state.sigma0y, -1);
+    state.sigxZ = sx.sigmaPos;
+    state.sigyZ = sy.sigmaPos;
+  }
+
+  function recomputeAll() {
+    generateInitialDistribution();
+    recomputeLatticeAndEnvelope();
+    drawAll();
+  }
+
+  function canvasSetup(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return {ctx, w: rect.width, h: rect.height};
+  }
+
+  function drawAxes(ctx, w, h, xLabel, yLabel, keepExisting=false, drawLabels=true) {
+    if (!keepExisting) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+    }
+    const m = {l:54, r:14, t:14, b:42};
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+    ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
+    if (drawLabels) {
+      ctx.fillStyle = '#222'; ctx.font = '12px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(xLabel, (w + m.l - m.r) / 2, h - 10);
+      ctx.save(); ctx.translate(14, (h + m.t - m.b)/2); ctx.rotate(-Math.PI/2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+    }
+    return m;
+  }
+
+  function drawGrid(ctx, w, h, m, xMin, xMax, yMin, yMax, drawTickLabels=true) {
+    const px = x => m.l + (x - xMin) / (xMax - xMin) * (w - m.l - m.r);
+    const py = y => h - m.b - (y - yMin) / (yMax - yMin) * (h - m.t - m.b);
+    ctx.strokeStyle = '#ececf1'; ctx.lineWidth = 1;
+    ctx.fillStyle = '#555'; ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let i = 0; i <= 4; i++) {
+      const x = xMin + (xMax - xMin) * i / 4;
+      const xx = px(x);
+      ctx.beginPath(); ctx.moveTo(xx, m.t); ctx.lineTo(xx, h - m.b); ctx.stroke();
+      if (drawTickLabels) ctx.fillText(fmt(x, 2), xx, h - m.b + 4);
+    }
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const y = yMin + (yMax - yMin) * i / 4;
+      const yy = py(y);
+      ctx.beginPath(); ctx.moveTo(m.l, yy); ctx.lineTo(w - m.r, yy); ctx.stroke();
+      if (drawTickLabels) ctx.fillText(fmt(y, 2), m.l - 5, yy);
+    }
+    ctx.strokeStyle = '#b7b7c2';
+    if (xMin < 0 && xMax > 0) { ctx.beginPath(); ctx.moveTo(px(0), m.t); ctx.lineTo(px(0), h-m.b); ctx.stroke(); }
+    if (yMin < 0 && yMax > 0) { ctx.beginPath(); ctx.moveTo(m.l, py(0)); ctx.lineTo(w-m.r, py(0)); ctx.stroke(); }
+    return {px, py};
+  }
+
+  function densityPlot(canvasId, xs, ys, xrange, yrange, xLabel, yLabel) {
+    const canvas = document.getElementById(canvasId);
+    const {ctx, w, h} = canvasSetup(canvas);
+    // First pass: draw background/grid only. Text labels are drawn once at the end.
+    // This avoids the doubled/overlapped tick/axis labels caused by redrawing on top.
+    const m = drawAxes(ctx, w, h, xLabel, yLabel, false, false);
+    const map = drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange, false);
+
+    // Histogram-based filled density plot. Zero-density bins remain white.
+    const nx = DENSITY_BINS;
+    const ny = DENSITY_BINS;
+    const hist = Array.from({length: ny}, () => new Float64Array(nx));
+
+    for (let i = 0; i < xs.length; i++) {
+      const x = xs[i], y = ys[i];
+      if (x < -xrange || x > xrange || y < -yrange || y > yrange) continue;
+      let ix = Math.floor((x + xrange) / (2 * xrange) * nx);
+      let iy = Math.floor((y + yrange) / (2 * yrange) * ny);
+      ix = Math.max(0, Math.min(nx - 1, ix));
+      iy = Math.max(0, Math.min(ny - 1, iy));
+      hist[iy][ix] += 1;
+    }
+
+    // Light smoothing to make the result look like a filled contour rather than blocky pixels.
+    const sm = Array.from({length: ny}, () => new Float64Array(nx));
+    const kernel = [[1,2,1],[2,4,2],[1,2,1]];
+    let vmax = 0;
+    for (let iy = 0; iy < ny; iy++) {
+      for (let ix = 0; ix < nx; ix++) {
+        let acc = 0, norm = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const yy = iy + dy, xx = ix + dx;
+            if (yy < 0 || yy >= ny || xx < 0 || xx >= nx) continue;
+            const wt = kernel[dy + 1][dx + 1];
+            acc += wt * hist[yy][xx];
+            norm += wt;
+          }
+        }
+        sm[iy][ix] = acc / norm;
+        if (sm[iy][ix] > vmax) vmax = sm[iy][ix];
+      }
+    }
+
+    function colorFor(t) {
+      // Quantized white-to-blue levels: visually similar to a filled contour map.
+      if (t <= 0) return '#ffffff';
+      const levels = ['#edf5ff', '#d7eaff', '#b7d7ff', '#8fbdff', '#5d99ee', '#2f6fce', '#174ea6'];
+      const j = Math.min(levels.length - 1, Math.floor(Math.pow(t, 0.45) * levels.length));
+      return levels[j];
+    }
+
+    if (vmax > 0) {
+      const x0 = map.px(-xrange), x1 = map.px(xrange);
+      const y0 = map.py(yrange), y1 = map.py(-yrange);
+      const cw = (x1 - x0) / nx;
+      const ch = (y1 - y0) / ny;
+      for (let iy = 0; iy < ny; iy++) {
+        for (let ix = 0; ix < nx; ix++) {
+          const t = sm[iy][ix] / vmax;
+          ctx.fillStyle = colorFor(t);
+          // Canvas y increases downward; iy=0 corresponds to lower y.
+          ctx.fillRect(x0 + ix * cw, y1 - (iy + 1) * ch, cw + 0.7, ch + 0.7);
+        }
+      }
+    }
+
+    // Redraw axes/grid and labels exactly once on top.
+    drawAxes(ctx, w, h, xLabel, yLabel, true, true);
+    drawGrid(ctx, w, h, m, -xrange, xrange, -yrange, yrange, true);
+  }
+
+  function drawEnvelope() {
+    const canvas = document.getElementById('envelopeCanvas');
+    const {ctx, w, h} = canvasSetup(canvas);
+    const sigx = state.sigxZ.map(v => v * 1e3);
+    const sigy = state.sigyZ.map(v => v * 1e3);
+    const maxSig = Math.max(...sigx, ...sigy, 1e-12) * 1.1 * state.yScale;
+    const m = drawAxes(ctx, w, h, 'z [m]', 'Beam size [mm]');
+    const map = drawGrid(ctx, w, h, m, 0, state.zMax, 0, maxSig);
+
+    // quads
+    const quadHeight = 0.15 * maxSig;
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    state.quads.forEach((q, i) => {
+      const left = q.z - q.L / 2;
+      const right = q.z + q.L / 2;
+      ctx.fillStyle = i === state.selectedQuad ? 'rgba(217,119,6,0.85)' : 'rgba(43,108,176,0.85)';
+      ctx.fillRect(map.px(left), map.py(quadHeight), map.px(right)-map.px(left), map.py(0)-map.py(quadHeight));
+      ctx.fillStyle = '#111';
+      ctx.fillText(`Q${i}`, map.px(q.z), map.py(quadHeight) - 3);
+    });
+
+    function line(data, color) {
+      ctx.strokeStyle = color; ctx.lineWidth = 2;
+      ctx.beginPath();
+      data.forEach((v, i) => {
+        const x = state.zGrid[i];
+        const xx = map.px(x), yy = map.py(v);
+        if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+      });
+      ctx.stroke();
+    }
+    line(sigx, getComputedStyle(document.documentElement).getPropertyValue('--xline').trim());
+    line(sigy, getComputedStyle(document.documentElement).getPropertyValue('--yline').trim());
+
+    // z view line
+    ctx.strokeStyle = 'rgba(193,18,31,0.75)'; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(map.px(state.zView), m.t); ctx.lineTo(map.px(state.zView), h-m.b); ctx.stroke(); ctx.setLineDash([]);
+
+    // legend
+    ctx.fillStyle = '#fff'; ctx.fillRect(w - 105, m.t + 8, 86, 46);
+    ctx.strokeStyle = '#ddd'; ctx.strokeRect(w - 105, m.t + 8, 86, 46);
+    ctx.font = '12px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#1f77b4'; ctx.beginPath(); ctx.moveTo(w-96, m.t+24); ctx.lineTo(w-76, m.t+24); ctx.stroke(); ctx.fillStyle = '#222'; ctx.fillText('σx', w-68, m.t+24);
+    ctx.strokeStyle = '#d62728'; ctx.beginPath(); ctx.moveTo(w-96, m.t+42); ctx.lineTo(w-76, m.t+42); ctx.stroke(); ctx.fillStyle = '#222'; ctx.fillText('σy', w-68, m.t+42);
+  }
+
+  function interpAt(arr, z) {
+    const zg = state.zGrid;
+    if (z <= zg[0]) return arr[0];
+    if (z >= zg[zg.length-1]) return arr[arr.length-1];
+    for (let i = 1; i < zg.length; i++) {
+      if (zg[i] >= z) {
+        const t = (z - zg[i-1]) / (zg[i] - zg[i-1]);
+        return arr[i-1] * (1 - t) + arr[i] * t;
+      }
+    }
+    return arr[arr.length-1];
+  }
+
+  function drawAll() {
+    const p = state.particles;
+    densityPlot('xxpCanvas', p.x.map(v=>v*1e3), p.xp.map(v=>v*1e3), state.xRangeInit, state.xpRangeInit, 'x [mm]', "x′ [mrad]");
+    densityPlot('yypCanvas', p.y.map(v=>v*1e3), p.yp.map(v=>v*1e3), state.yRangeInit, state.ypRangeInit, 'y [mm]', "y′ [mrad]");
+    densityPlot('xy0Canvas', p.x.map(v=>v*1e3), p.y.map(v=>v*1e3), state.xRangeInit, state.yRangeInit, 'x [mm]', 'y [mm]');
+    drawEnvelope();
+    const atz = propagateParticlesToZ(state.zView);
+    densityPlot('xyCanvas', atz.xz.map(v=>v*1e3), atz.yz.map(v=>v*1e3), state.xRangeCS, state.yRangeCS, 'x [mm]', 'y [mm]');
+    document.getElementById('statSigX').textContent = fmt(interpAt(state.sigxZ, state.zView)*1e3, 3) + ' mm';
+    document.getElementById('statSigY').textContent = fmt(interpAt(state.sigyZ, state.zView)*1e3, 3) + ' mm';
+    document.getElementById('statFinalX').textContent = fmt(state.sigxZ[state.sigxZ.length-1]*1e3, 3) + ' mm';
+    document.getElementById('statFinalY').textContent = fmt(state.sigyZ[state.sigyZ.length-1]*1e3, 3) + ' mm';
+    updateQuadSelectorLabels();
+    syncControlValues();
+  }
+
+  function clampSpecValue(spec, value) {
+    if (!Number.isFinite(value)) return getSpecValue(spec);
+
+    // Text boxes are intentionally not limited by the slider min/max.
+    // Sliders still have finite ranges for usability, but typed values can exceed them.
+    const positiveProps = new Set([
+      'sigx','sigy','sigxp','sigyp','epsx','epsy',
+      'energy','selectedL','zMax','xRangeInit','yRangeInit','xpRangeInit','ypRangeInit',
+      'yScale','xRangeCS','yRangeCS'
+    ]);
+    const nonnegativeProps = new Set(['selectedZ','zView']);
+
+    if (positiveProps.has(spec.prop) && value <= 0) return getSpecValue(spec);
+    if (nonnegativeProps.has(spec.prop) && value < 0) return getSpecValue(spec);
+    return value;
+  }
+
+  function updateNominalEmittances() {
+    state.epsx = Math.abs(state.sigx * state.sigxp);
+    state.epsy = Math.abs(state.sigy * state.sigyp);
+  }
+
+  function applySpecValue(spec, value) {
+    value = clampSpecValue(spec, value);
+
+    if (spec.prop === 'selectedG') state.quads[state.selectedQuad].G = value;
+    else if (spec.prop === 'selectedZ') state.quads[state.selectedQuad].z = value;
+    else if (spec.prop === 'selectedL') state.quads[state.selectedQuad].L = value;
+    else if (spec.prop === 'epsx') {
+      state.epsx = Math.abs(value);
+      state.sigxp = state.epsx / Math.max(Math.abs(state.sigx), 1e-30);
+    }
+    else if (spec.prop === 'epsy') {
+      state.epsy = Math.abs(value);
+      state.sigyp = state.epsy / Math.max(Math.abs(state.sigy), 1e-30);
+    }
+    else state[spec.prop] = value;
+
+    if (['sigx','sigxp','sigy','sigyp'].includes(spec.prop)) {
+      updateNominalEmittances();
+    }
+
+    if (spec.prop === 'selectedZ' || spec.prop === 'selectedL') {
+      clampQuadPositions();
+    }
+
+    if (spec.prop === 'zMax') {
+      const zViewInput = document.getElementById('zView');
+      if (zViewInput) zViewInput.max = Math.max(state.zMax, Number(zViewInput.max) || state.zMax);
+    }
+
+    if (spec.viewOnly) {
+      drawAll();
+    } else if (['sigx','sigy','sigxp','sigyp','epsx','epsy','epsx','epsy','slopeX','slopeY'].includes(spec.prop)) {
+      recomputeAll();
+    } else {
+      recomputeLatticeAndEnvelope();
+      drawAll();
+    }
+  }
+
+  function commitReadback(spec) {
+    const box = document.getElementById(spec.id + 'Box');
+    if (!box) return;
+    const value = Number(box.value.trim());
+    if (!Number.isFinite(value)) {
+      syncControlValues();
+      return;
+    }
+    applySpecValue(spec, value);
+  }
+
+  function makeControl(container, spec) {
+    const div = document.createElement('div'); div.className = 'control';
+    const label = document.createElement('label'); label.htmlFor = spec.id;
+    const spanLabel = document.createElement('span'); spanLabel.textContent = spec.label;
+    const spanValue = document.createElement('span'); spanValue.className = 'value'; spanValue.id = spec.id + 'Val';
+    label.append(spanLabel, spanValue);
+    div.appendChild(label);
+
+    const row = document.createElement('div'); row.className = 'control-row';
+    const input = document.createElement('input'); input.id = spec.id;
+    const box = document.createElement('input'); box.id = spec.id + 'Box'; box.className = 'readback'; box.type = 'text';
+    box.title = 'Type a value and press Enter';
+
+    if (spec.type === 'number') {
+      input.type = 'number'; input.step = spec.step; input.value = spec.value;
+    } else {
+      input.type = 'range'; input.min = spec.min; input.max = spec.max; input.step = spec.step;
+      input.value = spec.type === 'log' ? Math.log10(spec.value) : spec.value;
+    }
+
+    row.appendChild(input);
+    row.appendChild(box);
+    div.appendChild(row);
+    container.appendChild(div);
+
+    input.addEventListener('input', () => {
+      const raw = Number(input.value);
+      const value = spec.type === 'log' ? Math.pow(10, raw) : raw;
+      applySpecValue(spec, value);
+    });
+
+    box.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        commitReadback(spec);
+        box.blur();
+      }
+    });
+    box.addEventListener('change', () => commitReadback(spec));
+  }
+
+  function syncControlValues() {
+    for (const group of [controls.initial, controls.beamline]) {
+      for (const spec of group) {
+        const input = document.getElementById(spec.id);
+        const val = getSpecValue(spec);
+        if (!input) continue;
+        if (document.activeElement !== input) {
+          if (spec.type === 'log') input.value = Math.log10(val);
+          else input.value = val;
+        }
+        const box = document.getElementById(spec.id + 'Box');
+        if (box && document.activeElement !== box) box.value = fmtSetting(val, 6);
+        const el = document.getElementById(spec.id + 'Val');
+        if (el) el.textContent = fmtSetting(val, 4);
+      }
+    }
+  }
+
+  function getSpecValue(spec) {
+    if (spec.prop === 'selectedG') return state.quads[state.selectedQuad].G;
+    if (spec.prop === 'selectedZ') return state.quads[state.selectedQuad].z;
+    if (spec.prop === 'selectedL') return state.quads[state.selectedQuad].L;
+    return state[spec.prop];
+  }
+
+  function updateQuadSelectorLabels() {
+    const sel = document.getElementById('quadSelect');
+    const oldValue = String(state.selectedQuad);
+    sel.innerHTML = '';
+    state.quads.forEach((q, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `Q${i}: z=${fmtSetting(q.z, 3)} m, G=${fmtSetting(q.G, 3)} T/m, L=${fmtSetting(q.L, 3)} m`;
+      sel.appendChild(opt);
+    });
+    sel.value = oldValue;
+  }
+
+  function initUI() {
+    const initDiv = document.getElementById('initialControls');
+    const beamDiv = document.getElementById('beamlineControls');
+    controls.initial.forEach(c => makeControl(initDiv, c));
+    controls.beamline.forEach(c => makeControl(beamDiv, c));
+
+    document.querySelectorAll('input[name="distType"]').forEach(r => {
+      r.addEventListener('change', () => { state.distType = r.value; recomputeAll(); });
+    });
+    document.getElementById('quadSelect').addEventListener('change', e => {
+      state.selectedQuad = Number(e.target.value);
+      drawAll();
+    });
+    document.getElementById('addQuad').addEventListener('click', () => {
+      let zNew = state.quads.length ? state.quads[state.quads.length-1].z + 0.5 : 1.0;
+      zNew = Math.max(zNew, 0.10/2 + 0.1);
+      state.quads.push({z:zNew, G:1.0, L:0.10});
+      state.selectedQuad = state.quads.length - 1;
+      recomputeLatticeAndEnvelope(); drawAll();
+    });
+    document.getElementById('removeQuad').addEventListener('click', () => {
+      if (state.quads.length <= 1) return;
+      state.quads.splice(state.selectedQuad, 1);
+      state.selectedQuad = 0;
+      recomputeLatticeAndEnvelope(); drawAll();
+    });
+    document.getElementById('reset').addEventListener('click', () => {
+      Object.assign(state, {
+        distType:'Gaussian', sigx:1e-3, sigy:1e-3, sigxp:1e-4, sigyp:1e-4, epsx:1e-7, epsy:1e-7,
+        slopeX:0, slopeY:0, xRangeInit:3, yRangeInit:3, xpRangeInit:3, ypRangeInit:3,
+        zMax:10, energy:50, selectedQuad:0, zView:1, yScale:1, xRangeCS:5, yRangeCS:5,
+        quads:[{z:1.0, G:1.0, L:0.10}]
+      });
+      document.querySelector('input[name="distType"][value="Gaussian"]').checked = true;
+      document.getElementById('zView').max = state.zMax;
+      document.getElementById('zq').max = 100;
+      recomputeAll();
+    });
+
+    window.addEventListener('resize', () => drawAll());
+    updateQuadSelectorLabels();
+    syncControlValues();
+  }
+
+  initUI();
+  recomputeAll();
+})();
+</script>
+</body>
+</html>
